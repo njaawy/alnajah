@@ -135,8 +135,11 @@ try{dev=localStorage.getItem('alnajah_dev')||'';if(!dev){dev=Array.from(crypto.g
 const sa=()=>{try{localStorage.setItem('alnajah_auth',JSON.stringify(A))}catch(e){}};
 const adm=()=>S&&S.r==='admin';
 const H=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),x=>x.toString(16).padStart(2,'0')).join('');
-const okCode=async c=>{try{const u=Uint8Array.from(atob(c.replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0)),k=await crypto.subtle.importKey('jwk',PK,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);return await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},k,u,new TextEncoder().encode(dev.toUpperCase()))}catch(e){return false}};
-const licOK=async()=>!!A.lic&&await okCode(A.lic);
+let LIC=null;
+const okCode=async c=>{try{c=c.replace(/\s/g,'');if(c.indexOf('.')!==8)return false;const e=c.slice(0,8),u=Uint8Array.from(atob(c.slice(9).replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0)),k=await crypto.subtle.importKey('jwk',PK,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},k,u,new TextEncoder().encode(dev.toUpperCase()+'|'+e)))return false;const ex=e.slice(0,4)+'-'+e.slice(4,6)+'-'+e.slice(6),t=today();if(ex<t||(A.ls&&A.ls>t))return false;LIC={exp:ex};return true}catch(x){return false}};
+const dleft=()=>Math.ceil((new Date(LIC.exp)-new Date(today()))/864e5);
+const subH=()=>LIC?`<div class="card"><b>الاشتراك:</b> ${LIC.exp>='9999'?'دائم':'ينتهي في '+LIC.exp+' (بعد '+dleft()+' يوماً)'}</div>`:'';
+const licOK=async()=>{if(!A.lic||!await okCode(A.lic))return false;const t=today();if(!A.ls||A.ls<t){A.ls=t;sa()}return true};
 const G=$('#gate'),AP=$('.app');
 function gate(h){AP.style.display='none';$('#lo').style.display='none';G.style.display='block';G.innerHTML='<div class="card">'+h+'</div>'}
 async function boot(){if(!(window.crypto&&crypto.subtle))return gate('<h2>المتصفح غير مدعوم</h2><p>افتح البرنامج من Chrome أو Edge أو Safari.</p>');
@@ -149,25 +152,25 @@ const fld=(i,l,t='text')=>`<label style="margin-top:8px">${l}<input id="${i}" ty
 const err=m=>`<div class="chip neg">${m}</div>`;
 const actV=(m='')=>gate(`<h2>تفعيل البرنامج</h2><p>للمتابعة فعّل البرنامج أولاً. أرسل رمز جهازك للبائع. بعد قبول الطلب يصلك رمز التفعيل.</p>${fld('bn','اسمك أو اسم منشأتك')}<div class="chip">رمز الجهاز: <b dir="ltr">${dev}</b></div><div class="row"><button class="btn g" data-g="req">طلب تفعيل عبر واتساب</button></div>${fld('ac','رمز التفعيل')}${err(m)}<div class="row"><button class="btn" data-g="act" style="flex:1">تفعيل</button><button class="btn o" data-g="back" style="flex:1">رجوع</button></div>`);
 const setupV=(m='')=>gate(`<h2>إنشاء حساب</h2><p class="chip">${A.users.length?'بعد إنشاء الحساب يُفعَّل عند موافقة المدير.':'أول حساب يُنشأ يصبح مدير البرنامج.'}</p>${fld('su','اسم المستخدم')}${fld('sp','كلمة المرور','password')}${fld('sp2','تأكيد كلمة المرور','password')}${err(m)}<div class="row" style="margin-top:12px"><button class="btn" data-g="setup" style="flex:1">إنشاء الحساب</button><button class="btn o" data-g="back" style="flex:1">رجوع</button></div>`);
-const loginV=(m='',i=0)=>gate(`<h2>تسجيل الدخول</h2>${fld('lu','اسم المستخدم')}${fld('lp','كلمة المرور','password')}${i?`<div class="chip pos">${m}</div>`:err(m)}<button class="btn" data-g="login" style="width:100%;margin-top:12px">دخول</button><p style="text-align:center;color:var(--mu);margin:16px 0 4px">ليس لديك حساب؟</p><button class="btn o" data-g="signup" style="width:100%">إنشاء حساب</button><button class="btn o" data-g="forgot" style="width:100%;margin-top:8px;border-style:dashed">نسيت كلمة المرور؟</button>`);
+const loginV=(m='',i=0)=>gate(`<h2>تسجيل الدخول</h2>${fld('lu','اسم المستخدم')}${fld('lp','كلمة المرور','password')}${i?`<div class="chip pos">${m}</div>`:err(m)}<button class="btn" data-g="login" style="width:100%;margin-top:12px">دخول</button><p style="text-align:center;color:var(--mu);margin:16px 0 4px">ليس لديك حساب؟</p><button class="btn o" data-g="signup" style="width:100%">إنشاء حساب</button><button class="btn o" data-g="forgot" style="width:100%;margin-top:8px;border-style:dashed">نسيت كلمة المرور؟</button><button class="btn o" data-g="renew" style="width:100%;margin-top:8px;border-style:dashed">تفعيل / تجديد الاشتراك</button>`);
 const resetV=(m='')=>gate(`<h2>تعيين حساب جديد</h2><p class="chip">سيُنشأ حساب مدير بهذا الاسم، وإن كان الاسم موجوداً تُستبدل كلمة مروره.</p>${fld('ru','اسم المستخدم')}${fld('rp','كلمة المرور الجديدة','password')}${fld('rp2','تأكيد كلمة المرور','password')}${err(m)}<div class="row" style="margin-top:12px"><button class="btn" data-g="rsave" style="flex:1">حفظ</button><button class="btn o" data-g="back" style="flex:1">رجوع</button></div>`);
 const forgotV=(m='')=>gate(`<h2>استعادة الحساب</h2><p>أرسل رمز جهازك للبائع ليرسل لك رمز الاستعادة، ثم الصقه هنا. بياناتك ومبيعاتك لا تتأثر.</p><div class="chip">رمز الجهاز: <b dir="ltr">${dev}</b></div><div class="row"><button class="btn g" data-g="rreq">طلب رمز استعادة عبر واتساب</button></div>${fld('rc','رمز الاستعادة')}${err(m)}<div class="row" style="margin-top:12px"><button class="btn" data-g="rver" style="flex:1">تحقق</button><button class="btn o" data-g="back" style="flex:1">رجوع</button></div>`);
 const rsOK=async c=>{try{const u=Uint8Array.from(atob(c.replace(/\s/g,'').replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0)),k=await crypto.subtle.importKey('jwk',PK,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);return await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},k,u,new TextEncoder().encode('RESET:'+dev.toUpperCase()))}catch(e){return false}};
 G.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const g=b.dataset.g,v=i=>($('#'+i)||{}).value||'';
 if(g==='req')window.open('https://wa.me/'+VPH+'?text='+encodeURIComponent(`طلب تفعيل برنامج النجاح ALNAJAH\nالاسم: ${v('bn')}\nرمز الجهاز: ${dev}`),'_blank','noopener');
-else if(g==='act'){const c=v('ac').replace(/\s/g,'');if(c&&await okCode(c)){A.lic=c;sa();setupV()}else actV('رمز التفعيل غير صحيح')}
+else if(g==='act'){const c=v('ac').replace(/\s/g,'');if(c&&await okCode(c)){A.lic=c;sa();A.users.length?loginV('تم تفعيل الاشتراك. سجّل الدخول.',1):setupV()}else actV('رمز التفعيل غير صحيح أو منتهي')}
 else if(g==='setup'){const u=v('su').trim(),p=v('sp'),first=!A.users.length;if(!u||p.length<4)return setupV('اكتب اسماً وكلمة مرور (4 أحرف فأكثر)');if(p!==v('sp2'))return setupV('كلمتا المرور غير متطابقتين');if(A.users.some(x=>x.u===u))return setupV('اسم المستخدم موجود مسبقاً');const s=uid();A.users.push({u,s,p:await H(s+p),r:first?'admin':'user',st:first?'ok':'pending'});sa();if(first){try{sessionStorage.setItem('alnajah_s',JSON.stringify({u,r:'admin'}))}catch(x){}boot()}else loginV('تم إرسال طلبك. سيُفعَّل حسابك بعد موافقة المدير.',1)}
 else if(g==='signup'){if(await licOK())setupV();else actV()}else if(g==='back')loginV();
-else if(g==='forgot')forgotV();
+else if(g==='renew')actV();else if(g==='forgot')forgotV();
 else if(g==='rreq')window.open('https://wa.me/'+VPH+'?text='+encodeURIComponent(`طلب رمز استعادة حساب - النجاح ALNAJAH\nرمز الجهاز: ${dev}`),'_blank','noopener');
 else if(g==='rver'){if(await rsOK(v('rc')))resetV();else forgotV('غير صحيح')}
 else if(g==='rsave'){const u=v('ru').trim(),p=v('rp');if(!u||p.length<4)return resetV('اكتب اسماً وكلمة مرور (4 أحرف فأكثر)');if(p!==v('rp2'))return resetV('كلمتا المرور غير متطابقتين');const s=uid();let x=A.users.find(q=>q.u===u);if(x){x.s=s;x.p=await H(s+p);x.r='admin';x.st='ok'}else A.users.push({u,s,p:await H(s+p),r:'admin',st:'ok'});sa();loginV('تم حفظ الحساب. سجّل الدخول الآن.',1)}
-else if(g==='login'){if(!await licOK())return loginV('هذا الجهاز غير مفعّل. اضغط إنشاء حساب لتفعيل البرنامج أولاً.');const x=A.users.find(q=>q.u===v('lu').trim());if(x&&x.p===await H(x.s+v('lp'))){if(x.st==='pending')return loginV('حسابك بانتظار موافقة المدير.');if(x.st==='rejected')return loginV('تم رفض طلب الحساب. تواصل مع المدير.');try{sessionStorage.setItem('alnajah_s',JSON.stringify({u:x.u,r:x.r}))}catch(y){}boot()}else loginV('اسم المستخدم أو كلمة المرور غير صحيحة')}});
+else if(g==='login'){if(!await licOK())return loginV('هذا الجهاز غير مفعّل أو انتهى الاشتراك. اضغط تفعيل / تجديد الاشتراك.');const x=A.users.find(q=>q.u===v('lu').trim());if(x&&x.p===await H(x.s+v('lp'))){if(x.st==='pending')return loginV('حسابك بانتظار موافقة المدير.');if(x.st==='rejected')return loginV('تم رفض طلب الحساب. تواصل مع المدير.');try{sessionStorage.setItem('alnajah_s',JSON.stringify({u:x.u,r:x.r}))}catch(y){}boot()}else loginV('اسم المستخدم أو كلمة المرور غير صحيحة')}});
 $('#lo').onclick=()=>{try{sessionStorage.removeItem('alnajah_s')}catch(e){}boot()};
 function homeV(){const d=due(),ts=D.t.filter(t=>t.date===today()),sm=t=>fmt(ts.filter(x=>x.type===t).reduce((a,x)=>a+x.total,0));
 const T=[['sale','البيع','فاتورة بيع جديدة'],['purchase','الشراء','فاتورة شراء جديدة'],['payment','التسديد','استلام أو دفع مبلغ'],['fin','العمليات المالية','الملخص والتذكيرات والقيود'],['stmt','كشف حساب العميل','حركات حساب أي عميل'],['mat','المواد والأسعار','إضافة وتعديل المواد وأسعارها'],['cust','العملاء','قاعدة بيانات العملاء']];if(adm())T.push(['set','الإعدادات','المستخدمون وخيارات الطباعة']);
-$('#m').innerHTML=`<h2>القائمة الرئيسية</h2><div class="cards"><div class="card"><small>مبيعات اليوم</small><b>${sm('sale')}</b></div><div class="card"><small>مشتريات اليوم</small><b>${sm('purchase')}</b></div><div class="card"><small>العملاء</small><b>${D.c.length-1}</b></div></div>${d.length?`<div class="card alert"><b>لديك ${d.length} تذكير ديون مستحق (مرّ شهر).</b> <button class="btn" data-p="fin" style="margin-inline-start:8px">عرض التذكيرات</button></div>`:''}${adm()&&A.users.some(u=>u.st==='pending')?`<div class="card alert"><b>لديك طلبات إنشاء حساب بانتظار الموافقة.</b> <button class="btn" data-p="set" style="margin-inline-start:8px">عرض الطلبات</button></div>`:''}${adm()&&D.t.length&&(!D.s.bk||days(D.s.bk)>=30)?`<div class="card alert"><b>${D.s.bk?'مرّ أكثر من 30 يوماً على آخر نسخة احتياطية.':'لم تأخذ نسخة احتياطية بعد.'}</b> <button class="btn" data-p="set" style="margin-inline-start:8px">أخذ نسخة</button></div>`:''}<div class="tiles">${T.map(x=>`<button class="tile" data-p="${x[0]}"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</div>`}
-function setV(){$('#m').innerHTML=`<h2>الإعدادات</h2>${pendH()}<div class="card"><label style="flex-direction:row;align-items:center;gap:10px;color:var(--tx)"><input type="checkbox" id="spj" ${D.s.pj?'checked':''} style="width:22px;height:22px"> اقتراح طباعة القيد بعد حفظ كل عملية (اختياري)</label></div>${bkH()}<div class="card"><h3 style="margin-top:0">المستخدمون</h3><div class="row"><label>اسم المستخدم<input id="nu"></label><label>كلمة المرور<input id="np" type="password"></label><label>الصلاحية<select id="nr"><option value="user">مستخدم</option><option value="admin">مدير</option></select></label><button class="btn" data-ua="1">إضافة</button></div><table>${A.users.map(u=>`<tr><td>${esc(u.u)}</td><td>${u.st==='pending'?'بانتظار الموافقة':u.st==='rejected'?'مرفوض':u.r==='admin'?'مدير':'مستخدم'}</td><td>${u.u!==S.u?`<button class="x" data-ud="${esc(u.u)}" aria-label="حذف المستخدم">×</button>`:'أنت'}</td></tr>`).join('')}</table></div>`}
+$('#m').innerHTML=`<h2>القائمة الرئيسية</h2><div class="cards"><div class="card"><small>مبيعات اليوم</small><b>${sm('sale')}</b></div><div class="card"><small>مشتريات اليوم</small><b>${sm('purchase')}</b></div><div class="card"><small>العملاء</small><b>${D.c.length-1}</b></div></div>${d.length?`<div class="card alert"><b>لديك ${d.length} تذكير ديون مستحق (مرّ شهر).</b> <button class="btn" data-p="fin" style="margin-inline-start:8px">عرض التذكيرات</button></div>`:''}${adm()&&A.users.some(u=>u.st==='pending')?`<div class="card alert"><b>لديك طلبات إنشاء حساب بانتظار الموافقة.</b> <button class="btn" data-p="set" style="margin-inline-start:8px">عرض الطلبات</button></div>`:''}${adm()&&D.t.length&&(!D.s.bk||days(D.s.bk)>=30)?`<div class="card alert"><b>${D.s.bk?'مرّ أكثر من 30 يوماً على آخر نسخة احتياطية.':'لم تأخذ نسخة احتياطية بعد.'}</b> <button class="btn" data-p="set" style="margin-inline-start:8px">أخذ نسخة</button></div>`:''}${LIC&&LIC.exp<'9999'&&dleft()<=7?`<div class="card alert"><b>ينتهي اشتراكك بعد ${dleft()} يوم (${LIC.exp}).</b> <a class="btn g" style="display:inline-flex;align-items:center;text-decoration:none;margin-inline-start:8px" target="_blank" rel="noopener" href="https://wa.me/${VPH}?text=${encodeURIComponent('طلب تجديد اشتراك النجاح ALNAJAH\nرمز الجهاز: '+dev)}">طلب تجديد</a></div>`:''}<div class="tiles">${T.map(x=>`<button class="tile" data-p="${x[0]}"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}</div>`}
+function setV(){$('#m').innerHTML=`<h2>الإعدادات</h2>${subH()}${pendH()}<div class="card"><label style="flex-direction:row;align-items:center;gap:10px;color:var(--tx)"><input type="checkbox" id="spj" ${D.s.pj?'checked':''} style="width:22px;height:22px"> اقتراح طباعة القيد بعد حفظ كل عملية (اختياري)</label></div>${bkH()}<div class="card"><h3 style="margin-top:0">المستخدمون</h3><div class="row"><label>اسم المستخدم<input id="nu"></label><label>كلمة المرور<input id="np" type="password"></label><label>الصلاحية<select id="nr"><option value="user">مستخدم</option><option value="admin">مدير</option></select></label><button class="btn" data-ua="1">إضافة</button></div><table>${A.users.map(u=>`<tr><td>${esc(u.u)}</td><td>${u.st==='pending'?'بانتظار الموافقة':u.st==='rejected'?'مرفوض':u.r==='admin'?'مدير':'مستخدم'}</td><td>${u.u!==S.u?`<button class="x" data-ud="${esc(u.u)}" aria-label="حذف المستخدم">×</button>`:'أنت'}</td></tr>`).join('')}</table></div>`}
 document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;
 if(t.dataset.ua){const u=$('#nu').value.trim(),p=$('#np').value;if(!u||p.length<4)return toast('اكتب اسماً وكلمة مرور (4 أحرف فأكثر)',1);if(A.users.some(x=>x.u===u))return toast('اسم المستخدم موجود',1);const s=uid();A.users.push({u,s,p:await H(s+p),r:$('#nr').value});sa();toast('تمت إضافة المستخدم');setV()}
 else if(t.dataset.ud&&confirm('حذف المستخدم؟')){A.users=A.users.filter(x=>x.u!==t.dataset.ud);sa();setV()}});
@@ -213,5 +216,31 @@ save();toast('تم الاستيراد: '+C.length+' عميل، '+T.length+' عم
 let ed=null;boot();
 if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
+
+<script>
+// ===== ALNAJAH LINK PATCH - ربط المشتري بالمؤسس =====
+(function(){
+  const SHARED_KEY = 'alnajah_shared_orders';
+  // Buyer side: whenever auth is saved, also save to shared key
+  const orig_sa = window.sa;
+  if(orig_sa){
+    window.sa = function(){
+      orig_sa();
+      try{
+        const auth = JSON.parse(localStorage.getItem('alnajah_auth')||'{}');
+        const users = auth.users || [];
+        // Save pending to shared
+        localStorage.setItem(SHARED_KEY, JSON.stringify(users));
+        console.log('Linked: saved', users.length, 'to shared');
+      }catch(e){}
+    }
+  }
+  // Also expose for founder to read pending even if different prefix
+  window.getSharedPending = function(){
+    try{ return JSON.parse(localStorage.getItem(SHARED_KEY)||'[]'); }catch(e){return []}
+  }
+})();
+</script>
+
 </body>
 </html>
